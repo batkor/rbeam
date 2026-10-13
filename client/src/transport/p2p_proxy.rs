@@ -1,8 +1,10 @@
+use std::fs;
 use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
 use crate::protocol;
+use crate::protocol::ReceiveConfig;
 use crate::transport::{Cancel, is_cancelled, read_line};
 
 pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
@@ -40,11 +42,11 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
                 return Ok(stream);
             }
             Err(ref e)
-            if e.kind() == io::ErrorKind::WouldBlock
-                || e.kind() == io::ErrorKind::TimedOut =>
-                {
-                    continue;
-                }
+                if e.kind() == io::ErrorKind::WouldBlock
+                    || e.kind() == io::ErrorKind::TimedOut =>
+            {
+                continue;
+            }
             Err(e) => return Err(e),
         }
     }
@@ -65,7 +67,7 @@ pub fn connect(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     Ok(stream)
 }
 
-pub fn receive(mut stream: TcpStream, mode_label: &str) -> io::Result<()> {
+pub fn receive(mut stream: TcpStream, mode_label: &str, config: &ReceiveConfig) -> io::Result<()> {
     let global_start_time = std::time::Instant::now();
     let mut total_bytes_received: u64 = 0;
     let mut total_files_count: u32 = 0;
@@ -81,26 +83,64 @@ pub fn receive(mut stream: TcpStream, mode_label: &str) -> io::Result<()> {
 
         match command_marker[0] {
             protocol::CMD_CREATE_DIR => {
-                println!("[Parser Log] Caught marker -> Command: CREATE_DIR");
                 let dir = protocol::DirHeader::receive(&mut stream)?;
-                println!(
-                    "[Parser Log]   -> Success: Directory structure created on disk: \"{}\"",
-                    dir.relative_path
-                );
-                total_dirs_count += 1;
+
+                match protocol::resolve_output_path(config, &dir.relative_path) {
+                    Some(dest) => {
+                        fs::create_dir_all(&dest)?;
+
+                        if protocol::real_path_within(&config.base, &dest) {
+                            println!("[Parser Log] Directory created: \"{}\"", dir.relative_path);
+                            total_dirs_count += 1;
+                        } else {
+                            println!("[Parser Log] Rejected directory outside base: \"{}\"", dir.relative_path);
+                        }
+                    }
+                    None => {
+                        println!("[Parser Log] Rejected unsafe path: \"{}\"", dir.relative_path);
+                    }
+                }
             },
 
             protocol::CMD_START_FILE => {
-                println!("[Parser Log] Caught marker -> Command: START_FILE");
                 let file_meta = protocol::FileHeader::receive(&mut stream)?;
-                println!(
-                    "[Parser Log]   -> Receiving file: \"{}\" ({} bytes)",
-                    file_meta.relative_path, file_meta.size
-                );
-                file_meta.receive_content(&mut stream)?;
-                println!("[Parser Log]   -> Success: File saved completely.");
-                total_bytes_received += file_meta.size;
-                total_files_count += 1;
+
+                match protocol::resolve_output_path(config, &file_meta.relative_path) {
+                    Some(dest) => {
+                        if let Some(parent) = dest.parent() {
+                            fs::create_dir_all(parent)?;
+                        }
+
+                        let parent_ok = dest
+                            .parent()
+                            .map(|parent| protocol::real_path_within(&config.base, parent))
+                            .unwrap_or(false);
+
+                        if !parent_ok {
+                            println!("[Parser Log] Rejected file outside base: \"{}\"", file_meta.relative_path);
+                            file_meta.drain_content(&mut stream)?;
+                        } else if dest.exists() && !config.overwrite {
+                            println!(
+                                "[Parser Log] Skipped existing file: \"{}\" (use --override to replace)",
+                                file_meta.relative_path
+                            );
+                            file_meta.drain_content(&mut stream)?;
+                        } else {
+                            println!(
+                                "[Parser Log] Receiving file: \"{}\" ({} bytes)",
+                                file_meta.relative_path, file_meta.size
+                            );
+                            file_meta.receive_content_to(&mut stream, &dest)?;
+                            println!("[Parser Log] File saved: \"{}\"", file_meta.relative_path);
+                            total_bytes_received += file_meta.size;
+                            total_files_count += 1;
+                        }
+                    }
+                    None => {
+                        println!("[Parser Log] Rejected unsafe path: \"{}\"", file_meta.relative_path);
+                        file_meta.drain_content(&mut stream)?;
+                    }
+                }
             },
 
             protocol::CMD_END_STREAM => {

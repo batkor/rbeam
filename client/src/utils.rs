@@ -3,9 +3,41 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+use crate::protocol::ReceiveConfig;
+
 pub fn get_realpath(path_str: &String) -> io::Result<PathBuf> {
     let path = Path::new(path_str);
     fs::canonicalize(path)
+}
+
+pub fn configure_receiver(out: Option<&str>, overwrite: bool) -> io::Result<Option<ReceiveConfig>> {
+    let chosen = match out {
+        Some(dir) => dir.to_string(),
+        None => {
+            println!("Output directory:");
+            let mut line = String::new();
+            io::stdin().read_line(&mut line)?;
+            line.trim().to_string()
+        }
+    };
+
+    if chosen.is_empty() {
+        return Ok(None);
+    }
+
+    let base = PathBuf::from(&chosen);
+    fs::create_dir_all(&base)?;
+    let base = base.canonicalize()?;
+
+    println!("Files will be saved to {}. Continue? [Y/n]", base.display());
+    let mut answer = String::new();
+    io::stdin().read_line(&mut answer)?;
+    let answer = answer.trim().to_ascii_lowercase();
+    if answer == "n" || answer == "no" {
+        return Ok(None);
+    }
+
+    Ok(Some(ReceiveConfig { base, overwrite }))
 }
 
 pub fn print_transfer_summary(

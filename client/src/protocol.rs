@@ -1,27 +1,35 @@
 use std::fs::File;
-use std::{fs, io};
-use std::io::{Read, Write};
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub const CMD_CREATE_DIR: u8 = 1;
 pub const CMD_START_FILE: u8 = 2;
 pub const CMD_END_STREAM: u8 = 3;
 
-/// Normalizes a wire path into a safe relative one: both separators are
-/// handled, `..` is neutralized, and `:`/NUL are rejected.
+pub struct ReceiveConfig {
+    pub base: PathBuf,
+    pub overwrite: bool,
+}
+
+/// Returns a safe relative path from the wire, or `None` for anything not
+/// strictly relative: absolute paths, empty/`.`/`..` segments, drive letters
+/// (`:`), or NUL. Both `/` and `\` count as separators.
 pub fn sanitize_relative_path(raw: &str) -> Option<PathBuf> {
+    if raw.is_empty() {
+        return None;
+    }
+
     let mut safe = PathBuf::new();
 
     for part in raw.split(|c: char| c == '/' || c == '\\') {
-        match part {
-            "" | "." => continue,
-            ".." => {
-                safe.pop();
-            }
-            _ if part.contains(':') || part.contains('\0') => return None,
-            _ => safe.push(part),
+        if part.is_empty() || part == "." || part == ".." {
+            return None;
         }
+        if part.contains(':') || part.contains('\0') {
+            return None;
+        }
+        safe.push(part);
     }
 
     if safe.as_os_str().is_empty() {
@@ -29,6 +37,17 @@ pub fn sanitize_relative_path(raw: &str) -> Option<PathBuf> {
     }
 
     Some(safe)
+}
+
+pub fn resolve_output_path(config: &ReceiveConfig, raw: &str) -> Option<PathBuf> {
+    sanitize_relative_path(raw).map(|rel| config.base.join(rel))
+}
+
+/// True if `path` exists and resolves (through any symlinks) inside `base`.
+pub fn real_path_within(base: &Path, path: &Path) -> bool {
+    path.canonicalize()
+        .map(|real| real.starts_with(base))
+        .unwrap_or(false)
 }
 
 pub struct DirHeader {
@@ -55,14 +74,9 @@ impl DirHeader {
 
         let mut path_buffer = vec![0; path_len];
         stream.read_exact(&mut path_buffer)?;
-        let raw_path = String::from_utf8_lossy(&path_buffer);
-        let relative_path = sanitize_relative_path(&raw_path)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "unsafe path rejected"))?;
-        fs::create_dir_all(&relative_path)?;
+        let relative_path = String::from_utf8_lossy(&path_buffer).into_owned();
 
-        Ok(DirHeader {
-            relative_path: relative_path.to_string_lossy().into_owned(),
-        })
+        Ok(DirHeader { relative_path })
     }
 }
 
@@ -112,19 +126,17 @@ impl FileHeader {
 
         let mut path_buffer = vec![0; path_len];
         stream.read_exact(&mut path_buffer)?;
-        let raw_path = String::from_utf8_lossy(&path_buffer);
-        let relative_path = sanitize_relative_path(&raw_path)
-            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "unsafe path rejected"))?;
+        let relative_path = String::from_utf8_lossy(&path_buffer).into_owned();
 
         Ok(FileHeader {
             size,
-            relative_path: relative_path.to_string_lossy().into_owned(),
+            relative_path,
             real_path: PathBuf::new()
         })
     }
 
-    pub fn receive_content(&self, stream: &mut TcpStream) -> io::Result<()> {
-        let mut new_file = std::fs::File::create(&self.relative_path)?;
+    pub fn receive_content_to(&self, stream: &mut TcpStream, dest: &Path) -> io::Result<()> {
+        let mut new_file = File::create(dest)?;
         let mut bytes_received = 0;
         let mut file_buf = [0; 8192];
 
@@ -161,6 +173,18 @@ impl FileHeader {
 
         new_file.flush()?;
         println!();
+        Ok(())
+    }
+
+    pub fn drain_content(&self, stream: &mut TcpStream) -> io::Result<()> {
+        let mut remaining = self.size;
+        let mut file_buf = [0; 8192];
+
+        while remaining > 0 {
+            let to_read = std::cmp::min(file_buf.len() as u64, remaining) as usize;
+            stream.read_exact(&mut file_buf[..to_read])?;
+            remaining -= to_read as u64;
+        }
         Ok(())
     }
 }

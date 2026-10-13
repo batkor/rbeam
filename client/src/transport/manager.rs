@@ -5,6 +5,7 @@ use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
 use rand::Rng;
+use crate::protocol::ReceiveConfig;
 use crate::transport::{new_cancel, p2p_direct, p2p_proxy, p2p_radar};
 
 enum SelectedTransport {
@@ -74,7 +75,7 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
 
     println!("Receiver connected via transport: [{}]. Starting directory crawler...", transport_name);
 
-    if let Err(e) = crate::path_crawler::crawl_directory(target_path, &mut active_stream) {
+    if let Err(e) = crate::path_crawler::send_path(target_path, &mut active_stream) {
         eprintln!("[Manager Log] Directory crawler failed: {}", e);
         return Err(e);
     }
@@ -87,7 +88,7 @@ fn enabled(selected: &str, name: &str) -> bool {
     selected.eq_ignore_ascii_case("all") || selected.eq_ignore_ascii_case(name)
 }
 
-pub fn receive(code: u32) -> io::Result<()> {
+pub fn receive(code: u32, config: &ReceiveConfig) -> io::Result<()> {
     println!("=== Starting transport receive manager ===");
 
     let cancel = new_cancel();
@@ -136,7 +137,7 @@ pub fn receive(code: u32) -> io::Result<()> {
     drop(rx);
 
     println!("Match found! Connected to Sender. Starting packet parser...");
-    p2p_proxy::receive(active_stream, mode_label)?;
+    p2p_proxy::receive(active_stream, mode_label, config)?;
 
     Ok(())
 }

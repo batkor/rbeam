@@ -36,6 +36,14 @@ struct Args {
     /// Default: all (parallel race).
     #[arg(short, long, value_enum, default_value = "all")]
     transport: TransportKind,
+
+    /// Directory to write received files into. If omitted, the client asks.
+    #[arg(short, long)]
+    out: Option<String>,
+
+    /// Override existing files instead of skipping them.
+    #[arg(long = "override")]
+    overwrite: bool,
 }
 
 fn main() {
@@ -66,8 +74,18 @@ fn main() {
                 }
             };
 
-            if let Err(e) = transport::manager::receive(cleaned_code) {
-                eprintln!("Receiver error: {}", e);
+            match crate::utils::configure_receiver(args.out.as_deref(), args.overwrite) {
+                Ok(Some(config)) => {
+                    if let Err(e) = transport::manager::receive(cleaned_code, &config) {
+                        eprintln!("Receiver error: {}", e);
+                    }
+                }
+                Ok(None) => {
+                    println!("Cancelled: no output directory.");
+                }
+                Err(e) => {
+                    eprintln!("Receiver error (failed to configure output): {}", e);
+                }
             }
         }
     }
