@@ -1,0 +1,28 @@
+# Rust build artifacts
+/target
+**/target
+**/*.rs.bk
+*.pdb
+
+# Cargo.lock: committed for binaries, so NOT ignored
+
+# Docker
+docker-compose.override.yml
+
+# Editor / IDE
+.idea/
+.vscode/
+*.iml
+*.swp
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets / local config
+opencode.json
+opencode.jsonc
+.env
+*.env.local
+fixture

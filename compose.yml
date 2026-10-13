@@ -1,0 +1,33 @@
+services:
+  server:
+    build: ./server
+    tty: true
+    volumes:
+      - ./server:/usr/src/
+
+  client1:
+      build: ./client
+      tty: true
+      depends_on:
+        - server
+      volumes:
+        - ./client:/usr/src/
+        - ./fixture:/tmp/fixture
+      ports:
+        - "5001:5001"
+
+  client2:
+      build: ./client
+      tty: true
+      depends_on:
+        - server
+      volumes:
+        - ./client:/usr/src/
+      ports:
+        - "5002:5001"
+      cap_add:
+        - NET_ADMIN
+#      entrypoint: >
+#        sh -c "iptables -A INPUT -p udp --dport 5002 -j DROP && exec sh"
+#        sh -c "iptables -A INPUT -p udp --dport 5002 -j DROP && iptables -A OUTPUT -p tcp --dport 5001 -j DROP && exec sh"
+#        sh -c "iptables -A INPUT -p udp --dport 5002 -j DROP && iptables -A OUTPUT -p tcp ! --dport 80 -j DROP && exec sh"
