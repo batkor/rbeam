@@ -1,0 +1,9 @@
+# Example build-time configuration.
+# Copy to `.cargo/config.toml` (which is gitignored) and adjust for your deployment.
+
+[env]
+# Local interface the server binds to.
+SERVER_BIND = "0.0.0.0:80"
+
+# Public address clients use to reach the server.
+SERVER_ADDR = "example.com:80"

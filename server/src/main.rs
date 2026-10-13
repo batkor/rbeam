@@ -5,9 +5,11 @@ use std::thread;
 
 pub mod transfer;
 
+const SERVER_BIND: &str = env!("SERVER_BIND");
+
 fn main() {
-    let listener = TcpListener::bind("0.0.0.0:80").expect("Failed to bind to port 80");
-    println!("Relay server is running and listening on 0.0.0.0:80");
+    let listener = TcpListener::bind(SERVER_BIND).expect("Failed to bind server socket");
+    println!("Relay server is running and listening on {}", SERVER_BIND);
 
     let global_storage: transfer::ActiveTransfers = Arc::new(Mutex::new(HashMap::new()));
 

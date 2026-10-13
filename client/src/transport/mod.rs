@@ -14,6 +14,9 @@ use std::time::Duration;
 /// Shared kill-switch: once one transport wins, the rest must stop.
 pub type Cancel = Arc<AtomicBool>;
 
+/// Address clients use to reach the server (build-time config).
+pub const SERVER_ADDR: &str = env!("SERVER_ADDR");
+
 pub fn new_cancel() -> Cancel {
     Arc::new(AtomicBool::new(false))
 }

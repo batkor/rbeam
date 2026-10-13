@@ -20,6 +20,9 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 
+# Local build-time config (copy from .cargo/config.toml.example)
+.cargo/config.toml
+
 # Secrets / local config
 opencode.json
 opencode.jsonc

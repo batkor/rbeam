@@ -5,10 +5,10 @@ use std::time::Duration;
 
 use crate::protocol;
 use crate::protocol::ReceiveConfig;
-use crate::transport::{Cancel, is_cancelled, read_line};
+use crate::transport::{Cancel, SERVER_ADDR, is_cancelled, read_line};
 
 pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
-    let mut stream = TcpStream::connect("server:80")?;
+    let mut stream = TcpStream::connect(SERVER_ADDR)?;
 
     let registration_msg = format!("PROXY:{}\n", code);
     stream.write_all(registration_msg.as_bytes())?;
@@ -53,7 +53,7 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
 }
 
 pub fn connect(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
-    let mut stream = TcpStream::connect("server:80")?;
+    let mut stream = TcpStream::connect(SERVER_ADDR)?;
 
     let request = format!("GET:PROXY:{}\n", code);
     stream.write_all(request.as_bytes())?;

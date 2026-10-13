@@ -4,6 +4,7 @@ services:
     tty: true
     volumes:
       - ./server:/usr/src/
+      - ./.cargo/config.toml:/usr/local/cargo/config.toml
 
   client1:
       build: ./client
@@ -13,6 +14,7 @@ services:
       volumes:
         - ./client:/usr/src/
         - ./fixture:/tmp/fixture
+        - ./.cargo/config.toml:/usr/local/cargo/config.toml
       ports:
         - "5001:5001"
 
@@ -23,6 +25,7 @@ services:
         - server
       volumes:
         - ./client:/usr/src/
+        - ./.cargo/config.toml:/usr/local/cargo/config.toml
       ports:
         - "5002:5001"
       cap_add:

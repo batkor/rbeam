@@ -2,13 +2,13 @@ use std::io::{self, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
-use crate::transport::{Cancel, accept_cancellable, is_cancelled, read_line};
+use crate::transport::{Cancel, SERVER_ADDR, accept_cancellable, is_cancelled, read_line};
 
 pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     let p2p_listener = TcpListener::bind("0.0.0.0:5001")?;
     println!("[P2P] Local listener successfully bound to 0.0.0.0:5001");
 
-    let mut server_stream = TcpStream::connect("server:80")?;
+    let mut server_stream = TcpStream::connect(SERVER_ADDR)?;
     println!("[P2P] Connected to signaling server");
 
     let registration_msg = format!("DIRECT:{}\n", code);
@@ -27,7 +27,7 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
 }
 
 pub fn receive(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
-    let mut server_stream = TcpStream::connect("server:80")?;
+    let mut server_stream = TcpStream::connect(SERVER_ADDR)?;
 
     let request = format!("GET:DIRECT:{}\n", code);
     server_stream.write_all(request.as_bytes())?;
