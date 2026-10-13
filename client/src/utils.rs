@@ -29,7 +29,7 @@ pub fn configure_receiver(out: Option<&str>, overwrite: bool) -> io::Result<Opti
     fs::create_dir_all(&base)?;
     let base = base.canonicalize()?;
 
-    println!("Files will be saved to {}. Continue? [Y/n]", base.display());
+    println!("Files will be saved to {}/. Continue? [Y/n]", base.display());
     let mut answer = String::new();
     io::stdin().read_line(&mut answer)?;
     let answer = answer.trim().to_ascii_lowercase();
