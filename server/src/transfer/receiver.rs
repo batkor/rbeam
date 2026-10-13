@@ -3,7 +3,7 @@ use std::net::TcpStream;
 
 use crate::transfer::{ActiveTransfers, WAKE_BYTE, log_msg_with_code, relay_streams};
 
-/// Получатель спрашивает адрес отправителя для прямого (LAN) соединения.
+/// Receiver asks for the sender address to connect directly over LAN.
 pub fn get_direct(mut stream: TcpStream, code: u32, transfers: ActiveTransfers) {
     let direct_address = {
         let storage = transfers.lock().unwrap();
@@ -26,7 +26,8 @@ pub fn get_direct(mut stream: TcpStream, code: u32, transfers: ActiveTransfers) 
     }
 }
 
-/// Получатель просит relay через сервер. Сервер будит отправителя и проксирует трафик.
+/// Receiver requests a server relay: the server wakes the sender and
+/// proxies the traffic.
 pub fn get_proxy(mut stream: TcpStream, code: u32, transfers: ActiveTransfers) {
     let proxy_stream = {
         let mut storage = transfers.lock().unwrap();

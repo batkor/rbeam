@@ -32,7 +32,8 @@ struct Args {
     #[arg(short, long)]
     path: Option<String>,
 
-    /// Force a single sending transport for debugging. Default: all (parallel race).
+    /// Force a single sending transport for debugging.
+    /// Default: all (parallel race).
     #[arg(short, long, value_enum, default_value = "all")]
     transport: TransportKind,
 }
@@ -41,13 +42,13 @@ fn main() {
     let args = Args::parse();
 
     match args.path {
-        // --- SENDER ---
+        // Sender mode.
         Some(path) => {
             if let Err(e) = transport::manager::send(&path, args.transport.as_str()) {
                 eprintln!("Sender error: {}", e);
             }
         }
-        // --- GETTER ---
+        // Getter mode.
         None => {
             println!("Input code:");
             let mut code_str = String::new();

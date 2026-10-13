@@ -8,6 +8,29 @@ pub const CMD_CREATE_DIR: u8 = 1;
 pub const CMD_START_FILE: u8 = 2;
 pub const CMD_END_STREAM: u8 = 3;
 
+/// Normalizes a wire path into a safe relative one: both separators are
+/// handled, `..` is neutralized, and `:`/NUL are rejected.
+pub fn sanitize_relative_path(raw: &str) -> Option<PathBuf> {
+    let mut safe = PathBuf::new();
+
+    for part in raw.split(|c: char| c == '/' || c == '\\') {
+        match part {
+            "" | "." => continue,
+            ".." => {
+                safe.pop();
+            }
+            _ if part.contains(':') || part.contains('\0') => return None,
+            _ => safe.push(part),
+        }
+    }
+
+    if safe.as_os_str().is_empty() {
+        return None;
+    }
+
+    Some(safe)
+}
+
 pub struct DirHeader {
     pub relative_path: String,
 }
@@ -32,10 +55,14 @@ impl DirHeader {
 
         let mut path_buffer = vec![0; path_len];
         stream.read_exact(&mut path_buffer)?;
-        let relative_path = String::from_utf8_lossy(&path_buffer).into_owned();
+        let raw_path = String::from_utf8_lossy(&path_buffer);
+        let relative_path = sanitize_relative_path(&raw_path)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "unsafe path rejected"))?;
         fs::create_dir_all(&relative_path)?;
 
-        Ok(DirHeader { relative_path })
+        Ok(DirHeader {
+            relative_path: relative_path.to_string_lossy().into_owned(),
+        })
     }
 }
 
@@ -85,11 +112,13 @@ impl FileHeader {
 
         let mut path_buffer = vec![0; path_len];
         stream.read_exact(&mut path_buffer)?;
-        let relative_path = String::from_utf8_lossy(&path_buffer).into_owned();
+        let raw_path = String::from_utf8_lossy(&path_buffer);
+        let relative_path = sanitize_relative_path(&raw_path)
+            .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidData, "unsafe path rejected"))?;
 
         Ok(FileHeader {
             size,
-            relative_path,
+            relative_path: relative_path.to_string_lossy().into_owned(),
             real_path: PathBuf::new()
         })
     }

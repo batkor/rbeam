@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-/// Общий kill-switch: победил один транспорт — остальные обязаны умереть.
+/// Shared kill-switch: once one transport wins, the rest must stop.
 pub type Cancel = Arc<AtomicBool>;
 
 pub fn new_cancel() -> Cancel {
@@ -22,7 +22,6 @@ pub fn is_cancelled(cancel: &Cancel) -> bool {
     cancel.load(Ordering::SeqCst)
 }
 
-/// Читает ровно строку (до '\n') с опросом kill-switch, не забирая лишние байты.
 pub fn read_line(stream: &mut TcpStream, cancel: &Cancel) -> io::Result<String> {
     stream.set_read_timeout(Some(Duration::from_millis(200)))?;
 
@@ -59,7 +58,6 @@ pub fn read_line(stream: &mut TcpStream, cancel: &Cancel) -> io::Result<String> 
     Ok(String::from_utf8_lossy(&buf).trim().to_string())
 }
 
-/// accept с опросом kill-switch: не даёт проигравшему транспорту зависнуть.
 pub fn accept_cancellable(listener: &TcpListener, cancel: &Cancel) -> io::Result<TcpStream> {
     listener.set_nonblocking(true)?;
 
