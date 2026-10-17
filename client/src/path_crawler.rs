@@ -2,10 +2,9 @@ use crate::protocol;
 use std::fs;
 use std::io;
 use std::io::Write;
-use std::net::TcpStream;
 use std::path::PathBuf;
 
-pub fn send_path(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()> {
+pub fn send_path<W: Write>(start_path: PathBuf, stream: &mut W) -> io::Result<()> {
     let metadata = fs::symlink_metadata(&start_path)?;
 
     if metadata.is_file() {
@@ -39,7 +38,7 @@ pub fn send_path(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()> 
     Ok(())
 }
 
-fn crawl_directory(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()> {
+fn crawl_directory<W: Write>(start_path: PathBuf, stream: &mut W) -> io::Result<()> {
     let root_name = start_path
         .file_name()
         .map(|os_str| os_str.to_string_lossy().into_owned())

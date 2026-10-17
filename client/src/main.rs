@@ -1,6 +1,7 @@
 use clap::{Parser, ValueEnum};
 use std::io;
 
+pub mod crypto;
 pub mod path_crawler;
 pub mod protocol;
 pub mod transport;
@@ -66,17 +67,17 @@ fn main() {
                 return;
             }
 
-            let cleaned_code = match code_str.trim().parse::<u32>() {
-                Ok(num) => num,
-                Err(_) => {
-                    eprintln!("Receiver error: Invalid code format. Must be a number.");
+            let session = match utils::parse_session_code(&code_str) {
+                Some(session) => session,
+                None => {
+                    eprintln!("Receiver error: invalid code (expected format 123456-ABCDEF).");
                     return;
                 }
             };
 
             match crate::utils::configure_receiver(args.out.as_deref(), args.overwrite) {
                 Ok(Some(config)) => {
-                    if let Err(e) = transport::manager::receive(cleaned_code, &config) {
+                    if let Err(e) = transport::manager::receive(&session, &config) {
                         eprintln!("Receiver error: {}", e);
                     }
                 }

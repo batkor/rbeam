@@ -96,7 +96,7 @@ pub fn relay_streams(code: u32, client1: TcpStream, client2: TcpStream) {
     let mut c2_write = client2.try_clone().expect("Failed to clone c2");
 
     let t1 = thread::spawn(move || {
-        let mut buf = [0; 8192];
+        let mut buf = [0; 64 * 1024];
         while let Ok(n) = c1_read.read(&mut buf) {
             if n == 0 {
                 break;
@@ -111,7 +111,7 @@ pub fn relay_streams(code: u32, client1: TcpStream, client2: TcpStream) {
     let mut c1_write = client1;
 
     let t2 = thread::spawn(move || {
-        let mut buf = [0; 8192];
+        let mut buf = [0; 64 * 1024];
         while let Ok(n) = c2_read.read(&mut buf) {
             if n == 0 {
                 break;

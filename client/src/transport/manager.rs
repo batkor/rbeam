@@ -1,12 +1,14 @@
 use crate::protocol::ReceiveConfig;
 use crate::transport::{new_cancel, p2p_direct, p2p_proxy, p2p_radar};
-use rand::Rng;
+use crate::utils::SessionCode;
 use std::io;
 use std::net::TcpStream;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
+
+const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
 
 enum SelectedTransport {
     Radar(TcpStream),
@@ -17,9 +19,9 @@ enum SelectedTransport {
 pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
     println!("=== Starting transport send manager ===");
 
-    let mut rng = rand::thread_rng();
-    let code: u32 = rng.gen_range(100000..=999999);
-    println!("Your secure file-sharing code is: {}", code);
+    let session = crate::utils::generate_session_code();
+    let nameplate = session.nameplate;
+    println!("Your secure file-sharing code is: {}", session.display());
 
     let target_path = crate::utils::get_realpath(path)?;
     let cancel = new_cancel();
@@ -29,7 +31,7 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
         let c = cancel.clone();
         let radar_tx = tx.clone();
         thread::spawn(move || {
-            if let Ok(s) = p2p_radar::send(code, c) {
+            if let Ok(s) = p2p_radar::send(nameplate, c) {
                 let _ = radar_tx.send(SelectedTransport::Radar(s));
             }
         });
@@ -39,7 +41,7 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
         let c = cancel.clone();
         let direct_tx = tx.clone();
         thread::spawn(move || {
-            if let Ok(s) = p2p_direct::send(code, c) {
+            if let Ok(s) = p2p_direct::send(nameplate, c) {
                 let _ = direct_tx.send(SelectedTransport::Direct(s));
             }
         });
@@ -49,7 +51,7 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
         let c = cancel.clone();
         let proxy_tx = tx.clone();
         thread::spawn(move || {
-            if let Ok(s) = p2p_proxy::send(code, c) {
+            if let Ok(s) = p2p_proxy::send(nameplate, c) {
                 let _ = proxy_tx.send(SelectedTransport::Proxy(s));
             }
         });
@@ -57,7 +59,7 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
 
     drop(tx);
 
-    let (mut active_stream, transport_name) = match rx.recv_timeout(Duration::from_secs(300)) {
+    let (active_stream, transport_name) = match rx.recv_timeout(Duration::from_secs(300)) {
         Ok(SelectedTransport::Radar(s)) => (s, "RADAR"),
         Ok(SelectedTransport::Direct(s)) => (s, "DIRECT"),
         Ok(SelectedTransport::Proxy(s)) => (s, "PROXY"),
@@ -73,12 +75,18 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
     cancel.store(true, Ordering::SeqCst);
     drop(rx);
 
+    active_stream.set_read_timeout(Some(HANDSHAKE_TIMEOUT))?;
+    active_stream.set_write_timeout(Some(HANDSHAKE_TIMEOUT))?;
+    let mut secure = crate::crypto::handshake_initiator(active_stream, session.secret.as_bytes())?;
+    secure.get_mut().set_read_timeout(None)?;
+    secure.get_mut().set_write_timeout(None)?;
+
     println!(
-        "Receiver connected via transport: [{}]. Starting directory crawler...",
+        "Secure channel established via [{}]. Starting directory crawler...",
         transport_name
     );
 
-    if let Err(e) = crate::path_crawler::send_path(target_path, &mut active_stream) {
+    if let Err(e) = crate::path_crawler::send_path(target_path, &mut secure) {
         eprintln!("[Manager Log] Directory crawler failed: {}", e);
         return Err(e);
     }
@@ -91,16 +99,17 @@ fn enabled(selected: &str, name: &str) -> bool {
     selected.eq_ignore_ascii_case("all") || selected.eq_ignore_ascii_case(name)
 }
 
-pub fn receive(code: u32, config: &ReceiveConfig) -> io::Result<()> {
+pub fn receive(session: &SessionCode, config: &ReceiveConfig) -> io::Result<()> {
     println!("=== Starting transport receive manager ===");
 
+    let nameplate = session.nameplate;
     let cancel = new_cancel();
     let (tx, rx) = mpsc::channel::<SelectedTransport>();
 
     let c = cancel.clone();
     let radar_tx = tx.clone();
     thread::spawn(move || {
-        if let Ok(s) = p2p_radar::receive(code, c) {
+        if let Ok(s) = p2p_radar::receive(nameplate, c) {
             let _ = radar_tx.send(SelectedTransport::Radar(s));
         }
     });
@@ -108,7 +117,7 @@ pub fn receive(code: u32, config: &ReceiveConfig) -> io::Result<()> {
     let c = cancel.clone();
     let direct_tx = tx.clone();
     thread::spawn(move || {
-        if let Ok(s) = p2p_direct::receive(code, c) {
+        if let Ok(s) = p2p_direct::receive(nameplate, c) {
             let _ = direct_tx.send(SelectedTransport::Direct(s));
         }
     });
@@ -116,7 +125,7 @@ pub fn receive(code: u32, config: &ReceiveConfig) -> io::Result<()> {
     let c = cancel.clone();
     let proxy_tx = tx.clone();
     thread::spawn(move || {
-        if let Ok(s) = p2p_proxy::connect(code, c) {
+        if let Ok(s) = p2p_proxy::connect(nameplate, c) {
             let _ = proxy_tx.send(SelectedTransport::Proxy(s));
         }
     });
@@ -139,8 +148,14 @@ pub fn receive(code: u32, config: &ReceiveConfig) -> io::Result<()> {
     cancel.store(true, Ordering::SeqCst);
     drop(rx);
 
-    println!("Match found! Connected to Sender. Starting packet parser...");
-    p2p_proxy::receive(active_stream, mode_label, config)?;
+    active_stream.set_read_timeout(Some(HANDSHAKE_TIMEOUT))?;
+    active_stream.set_write_timeout(Some(HANDSHAKE_TIMEOUT))?;
+    let mut secure = crate::crypto::handshake_responder(active_stream, session.secret.as_bytes())?;
+    secure.get_mut().set_read_timeout(None)?;
+    secure.get_mut().set_write_timeout(None)?;
+
+    println!("Secure channel established. Starting packet parser...");
+    p2p_proxy::receive(secure, mode_label, config)?;
 
     Ok(())
 }

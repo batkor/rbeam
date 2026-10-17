@@ -72,7 +72,7 @@ pub fn connect(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     Ok(stream)
 }
 
-pub fn receive(mut stream: TcpStream, mode_label: &str, config: &ReceiveConfig) -> io::Result<()> {
+pub fn receive<R: Read>(mut stream: R, mode_label: &str, config: &ReceiveConfig) -> io::Result<()> {
     let global_start_time = std::time::Instant::now();
     let mut total_bytes_received: u64 = 0;
     let mut total_files_count: u32 = 0;

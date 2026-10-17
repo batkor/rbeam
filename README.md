@@ -3,6 +3,7 @@
 [English](README.md) | [Русский](README.ru.md)
 
 A peer-to-peer file and directory transfer tool with a self-hostable signaling and relay server.
+Traffic is end-to-end encrypted with a key derived from a short sharing code.
 
 Binaries: `rbeam` (client) and `rbeam-relay` (server).
 
@@ -27,6 +28,8 @@ connection wins and the rest are cancelled:
 - **LAN-first** — transfers stay on the local network whenever possible.
 - **Automatic fallback** — if direct connectivity fails, the relay keeps it working.
 - **No data storage on the server** — it is a signaler/relay, not a vault.
+- **End-to-end encrypted** — SPAKE2 key agreement from the code, then ChaCha20-Poly1305;
+  the server only ever sees ciphertext.
 - **Self-hostable** — build your own instance with your own host and port baked in.
 - **Safe receive** — files are written only into a directory you choose, with path validation.
 
@@ -60,7 +63,7 @@ Sender:
 cargo run -- --path /tmp/fixture
 ```
 
-It prints a 6-digit sharing code.
+It prints a sharing code like `123456-ABCDEF` (a public nameplate plus a secret).
 
 Receiver:
 
@@ -93,9 +96,13 @@ are available.
 
 ## Security
 
+- The code has two parts: a public **nameplate** (used by the server to find the session)
+  and a **secret** (never sent to the server). The secret is used in SPAKE2 to derive a
+  strong session key; after that, data is encrypted and authenticated with ChaCha20-Poly1305.
+- A wrong secret fails key confirmation and the connection is dropped.
 - The receiver treats the sender as untrusted: paths are validated and confined to `--out`;
   absolute paths, `..`, drive letters and NUL are rejected.
 - Existing files are skipped unless `--override`.
 - Symlinks and special files are skipped on the sender.
-- The 6-digit code is not an authentication secret, and there is no TLS/encryption between
-  peers. Use it on networks you trust.
+- The server relays only ciphertext. The short secret limits online guessing, so pick a
+  network and a code you trust.

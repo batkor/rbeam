@@ -1,11 +1,12 @@
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::net::TcpStream;
 use std::path::{Path, PathBuf};
 
 pub const CMD_CREATE_DIR: u8 = 1;
 pub const CMD_START_FILE: u8 = 2;
 pub const CMD_END_STREAM: u8 = 3;
+
+const IO_BUF: usize = 64 * 1024;
 
 pub struct ReceiveConfig {
     pub base: PathBuf,
@@ -55,7 +56,7 @@ pub struct DirHeader {
 }
 
 impl DirHeader {
-    pub fn send(&self, stream: &mut TcpStream) -> io::Result<()> {
+    pub fn send<W: Write>(&self, stream: &mut W) -> io::Result<()> {
         stream.write_all(&[CMD_CREATE_DIR])?;
 
         let path_bytes = self.relative_path.as_bytes();
@@ -66,7 +67,7 @@ impl DirHeader {
         stream.flush()
     }
 
-    pub fn receive(stream: &mut TcpStream) -> io::Result<Self> {
+    pub fn receive<R: Read>(stream: &mut R) -> io::Result<Self> {
         let mut len_buffer = [0; 2];
         stream.read_exact(&mut len_buffer)?;
         let path_len = u16::from_be_bytes(len_buffer) as usize;
@@ -86,7 +87,7 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
-    pub fn send(&self, stream: &mut TcpStream) -> io::Result<()> {
+    pub fn send<W: Write>(&self, stream: &mut W) -> io::Result<()> {
         stream.write_all(&[CMD_START_FILE])?;
         stream.write_all(&self.size.to_be_bytes())?;
 
@@ -98,9 +99,9 @@ impl FileHeader {
         stream.flush()
     }
 
-    pub fn send_content(&self, stream: &mut TcpStream) -> io::Result<()> {
+    pub fn send_content<W: Write>(&self, stream: &mut W) -> io::Result<()> {
         let mut file = File::open(&self.real_path)?;
-        let mut file_buf = [0; 8192];
+        let mut file_buf = [0; IO_BUF];
         let mut bytes_sent = 0;
 
         while bytes_sent < self.size {
@@ -115,7 +116,7 @@ impl FileHeader {
         stream.flush()
     }
 
-    pub fn receive(stream: &mut TcpStream) -> io::Result<Self> {
+    pub fn receive<R: Read>(stream: &mut R) -> io::Result<Self> {
         let mut size_buffer = [0; 8];
         stream.read_exact(&mut size_buffer)?;
         let size = u64::from_be_bytes(size_buffer);
@@ -135,12 +136,13 @@ impl FileHeader {
         })
     }
 
-    pub fn receive_content_to(&self, stream: &mut TcpStream, dest: &Path) -> io::Result<()> {
+    pub fn receive_content_to<R: Read>(&self, stream: &mut R, dest: &Path) -> io::Result<()> {
         let mut new_file = File::create(dest)?;
         let mut bytes_received = 0;
-        let mut file_buf = [0; 8192];
+        let mut file_buf = [0; IO_BUF];
 
         let start_time = std::time::Instant::now();
+        let mut last_log = start_time;
 
         while bytes_received < self.size {
             let to_read = std::cmp::min(file_buf.len() as u64, self.size - bytes_received) as usize;
@@ -150,20 +152,23 @@ impl FileHeader {
 
             bytes_received += to_read as u64;
 
-            let percent = (bytes_received * 100).checked_div(self.size).unwrap_or(100);
+            let now = std::time::Instant::now();
+            if now.duration_since(last_log).as_millis() >= 200 || bytes_received >= self.size {
+                let percent = (bytes_received * 100).checked_div(self.size).unwrap_or(100);
+                let elapsed = start_time.elapsed().as_secs_f64();
+                let speed_mb = if elapsed > 0.0 {
+                    (bytes_received as f64 / elapsed) / (1024.0 * 1024.0)
+                } else {
+                    0.0
+                };
 
-            let elapsed = start_time.elapsed().as_secs_f64();
-            let speed_mb = if elapsed > 0.0 {
-                (bytes_received as f64 / elapsed) / (1024.0 * 1024.0)
-            } else {
-                0.0
-            };
-
-            print!(
-                "\r[Parser Log]   -> Progress: {}% | Received: {}/{} bytes | Speed: {:.2} MB/s",
-                percent, bytes_received, self.size, speed_mb
-            );
-            let _ = std::io::stdout().flush();
+                print!(
+                    "\r[Parser Log]   -> Progress: {}% | Received: {}/{} bytes | Speed: {:.2} MB/s",
+                    percent, bytes_received, self.size, speed_mb
+                );
+                let _ = std::io::stdout().flush();
+                last_log = now;
+            }
         }
 
         new_file.flush()?;
@@ -171,9 +176,9 @@ impl FileHeader {
         Ok(())
     }
 
-    pub fn drain_content(&self, stream: &mut TcpStream) -> io::Result<()> {
+    pub fn drain_content<R: Read>(&self, stream: &mut R) -> io::Result<()> {
         let mut remaining = self.size;
-        let mut file_buf = [0; 8192];
+        let mut file_buf = [0; IO_BUF];
 
         while remaining > 0 {
             let to_read = std::cmp::min(file_buf.len() as u64, remaining) as usize;
