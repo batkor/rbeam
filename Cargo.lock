@@ -99,14 +99,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
-name = "client"
-version = "0.1.0"
-dependencies = [
- "clap",
- "rand",
-]
-
-[[package]]
 name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -205,7 +197,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "server"
+name = "rbeam"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "rand",
+]
+
+[[package]]
+name = "rbeam-relay"
 version = "0.1.0"
 
 [[package]]
