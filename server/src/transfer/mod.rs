@@ -87,7 +87,6 @@ pub fn handle_client(mut stream: TcpStream, transfers: ActiveTransfers) {
     if let Some(code_str) = get_data.strip_prefix("PROXY:") {
         if let Ok(code) = code_str.parse::<u32>() {
             sender::register_proxy(stream, code, transfers);
-            return;
         }
     }
 }

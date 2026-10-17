@@ -22,7 +22,7 @@ pub fn sanitize_relative_path(raw: &str) -> Option<PathBuf> {
 
     let mut safe = PathBuf::new();
 
-    for part in raw.split(|c: char| c == '/' || c == '\\') {
+    for part in raw.split(['/', '\\']) {
         if part.is_empty() || part == "." || part == ".." {
             return None;
         }
@@ -150,11 +150,7 @@ impl FileHeader {
 
             bytes_received += to_read as u64;
 
-            let percent = if self.size > 0 {
-                (bytes_received * 100) / self.size
-            } else {
-                100
-            };
+            let percent = (bytes_received * 100).checked_div(self.size).unwrap_or(100);
 
             let elapsed = start_time.elapsed().as_secs_f64();
             let speed_mb = if elapsed > 0.0 {

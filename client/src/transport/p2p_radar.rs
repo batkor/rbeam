@@ -28,7 +28,7 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
         let broadcast_addr: SocketAddr = "255.255.255.255:5002".parse().unwrap();
 
         while !is_cancelled(&broadcaster_cancel) {
-            if socket.send_to(msg.as_bytes(), &broadcast_addr).is_err() {
+            if socket.send_to(msg.as_bytes(), broadcast_addr).is_err() {
                 break;
             }
             thread::sleep(Duration::from_millis(500));
