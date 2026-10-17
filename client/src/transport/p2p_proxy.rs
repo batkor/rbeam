@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use crate::protocol;
 use crate::protocol::ReceiveConfig;
-use crate::transport::{Cancel, SERVER_ADDR, is_cancelled, read_line};
+use crate::transport::{is_cancelled, read_line, Cancel, SERVER_ADDR};
 
 pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     let mut stream = TcpStream::connect(SERVER_ADDR)?;
@@ -16,7 +16,10 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
 
     let server_response = read_line(&mut stream, &cancel)?;
     if server_response.starts_with("ERR") {
-        return Err(io::Error::new(io::ErrorKind::AlreadyExists, "Code conflict on server"));
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "Code conflict on server",
+        ));
     }
 
     println!("Proxy bridge socket registered successfully on server. Awaiting peer...");
@@ -42,8 +45,7 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
                 return Ok(stream);
             }
             Err(ref e)
-                if e.kind() == io::ErrorKind::WouldBlock
-                    || e.kind() == io::ErrorKind::TimedOut =>
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
             {
                 continue;
             }
@@ -61,7 +63,10 @@ pub fn connect(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
 
     let response = read_line(&mut stream, &cancel)?;
     if !response.starts_with("OK") {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "No proxy sender registered"));
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "No proxy sender registered",
+        ));
     }
 
     Ok(stream)
@@ -93,14 +98,20 @@ pub fn receive(mut stream: TcpStream, mode_label: &str, config: &ReceiveConfig) 
                             println!("[Parser Log] Directory created: \"{}\"", dir.relative_path);
                             total_dirs_count += 1;
                         } else {
-                            println!("[Parser Log] Rejected directory outside base: \"{}\"", dir.relative_path);
+                            println!(
+                                "[Parser Log] Rejected directory outside base: \"{}\"",
+                                dir.relative_path
+                            );
                         }
                     }
                     None => {
-                        println!("[Parser Log] Rejected unsafe path: \"{}\"", dir.relative_path);
+                        println!(
+                            "[Parser Log] Rejected unsafe path: \"{}\"",
+                            dir.relative_path
+                        );
                     }
                 }
-            },
+            }
 
             protocol::CMD_START_FILE => {
                 let file_meta = protocol::FileHeader::receive(&mut stream)?;
@@ -117,7 +128,10 @@ pub fn receive(mut stream: TcpStream, mode_label: &str, config: &ReceiveConfig) 
                             .unwrap_or(false);
 
                         if !parent_ok {
-                            println!("[Parser Log] Rejected file outside base: \"{}\"", file_meta.relative_path);
+                            println!(
+                                "[Parser Log] Rejected file outside base: \"{}\"",
+                                file_meta.relative_path
+                            );
                             file_meta.drain_content(&mut stream)?;
                         } else if dest.exists() && !config.overwrite {
                             println!(
@@ -137,28 +151,36 @@ pub fn receive(mut stream: TcpStream, mode_label: &str, config: &ReceiveConfig) 
                         }
                     }
                     None => {
-                        println!("[Parser Log] Rejected unsafe path: \"{}\"", file_meta.relative_path);
+                        println!(
+                            "[Parser Log] Rejected unsafe path: \"{}\"",
+                            file_meta.relative_path
+                        );
                         file_meta.drain_content(&mut stream)?;
                     }
                 }
-            },
+            }
 
             protocol::CMD_END_STREAM => {
                 println!("[Parser Log] Caught marker -> Command: END_STREAM");
-                println!("[Parser Log] All directory layouts received successfully. Exiting cleanly.");
+                println!(
+                    "[Parser Log] All directory layouts received successfully. Exiting cleanly."
+                );
 
                 crate::utils::print_transfer_summary(
                     mode_label,
                     global_start_time,
                     total_bytes_received,
                     total_files_count,
-                    total_dirs_count
+                    total_dirs_count,
                 );
                 break;
-            },
+            }
 
             _ => {
-                println!("[Parser Log] Warning: Unknown protocol marker received: {}", command_marker[0]);
+                println!(
+                    "[Parser Log] Warning: Unknown protocol marker received: {}",
+                    command_marker[0]
+                );
                 break;
             }
         }

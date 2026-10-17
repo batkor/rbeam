@@ -1,9 +1,9 @@
+use crate::protocol;
 use std::fs;
 use std::io;
 use std::io::Write;
 use std::net::TcpStream;
 use std::path::PathBuf;
-use crate::protocol;
 
 pub fn send_path(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()> {
     let metadata = fs::symlink_metadata(&start_path)?;
@@ -47,13 +47,15 @@ fn crawl_directory(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()
 
     println!("Crawler sending root directory layout: {}", root_name);
 
-    let root_header = protocol::DirHeader { relative_path: root_name.clone() };
+    let root_header = protocol::DirHeader {
+        relative_path: root_name.clone(),
+    };
     root_header.send(stream)?;
 
     let mut dir_stack = vec![start_path.clone()];
 
     while let Some(current_dir) = dir_stack.pop() {
-        let rel_path =  current_dir
+        let rel_path = current_dir
             .strip_prefix(&start_path)
             .map(|p| p.to_string_lossy().into_owned())
             .unwrap_or_default();
@@ -62,14 +64,20 @@ fn crawl_directory(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()
             let full_rel_path = format!("{}/{}", root_name, rel_path);
             println!("Crawler sending directory layout: {}", full_rel_path);
 
-            let dir_header = protocol::DirHeader { relative_path: full_rel_path };
+            let dir_header = protocol::DirHeader {
+                relative_path: full_rel_path,
+            };
             dir_header.send(stream)?;
         }
 
         let entries = match fs::read_dir(&current_dir) {
             Ok(entries) => entries,
             Err(e) => {
-                println!("Skipping unreadable directory: {} ({})", current_dir.display(), e);
+                println!(
+                    "Skipping unreadable directory: {} ({})",
+                    current_dir.display(),
+                    e
+                );
                 continue;
             }
         };
@@ -78,7 +86,11 @@ fn crawl_directory(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()
             let entry = match entry {
                 Ok(entry) => entry,
                 Err(e) => {
-                    println!("Skipping unreadable entry in {} ({})", current_dir.display(), e);
+                    println!(
+                        "Skipping unreadable entry in {} ({})",
+                        current_dir.display(),
+                        e
+                    );
                     continue;
                 }
             };
@@ -88,7 +100,11 @@ fn crawl_directory(start_path: PathBuf, stream: &mut TcpStream) -> io::Result<()
             let file_type = match entry.file_type() {
                 Ok(file_type) => file_type,
                 Err(e) => {
-                    println!("Skipping entry with unknown type: {} ({})", path.display(), e);
+                    println!(
+                        "Skipping entry with unknown type: {} ({})",
+                        path.display(),
+                        e
+                    );
                     continue;
                 }
             };

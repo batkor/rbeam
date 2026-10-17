@@ -55,7 +55,6 @@ pub struct DirHeader {
 }
 
 impl DirHeader {
-
     pub fn send(&self, stream: &mut TcpStream) -> io::Result<()> {
         stream.write_all(&[CMD_CREATE_DIR])?;
 
@@ -87,7 +86,6 @@ pub struct FileHeader {
 }
 
 impl FileHeader {
-
     pub fn send(&self, stream: &mut TcpStream) -> io::Result<()> {
         stream.write_all(&[CMD_START_FILE])?;
         stream.write_all(&self.size.to_be_bytes())?;
@@ -107,7 +105,9 @@ impl FileHeader {
 
         while bytes_sent < self.size {
             let n = file.read(&mut file_buf)?;
-            if n == 0 { break; }
+            if n == 0 {
+                break;
+            }
 
             stream.write_all(&file_buf[..n])?;
             bytes_sent += n as u64;
@@ -131,7 +131,7 @@ impl FileHeader {
         Ok(FileHeader {
             size,
             relative_path,
-            real_path: PathBuf::new()
+            real_path: PathBuf::new(),
         })
     }
 
@@ -152,8 +152,7 @@ impl FileHeader {
 
             let percent = if self.size > 0 {
                 (bytes_received * 100) / self.size
-            }
-            else {
+            } else {
                 100
             };
 

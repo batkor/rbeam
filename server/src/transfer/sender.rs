@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use crate::transfer::{ActiveTransfers, TransferSession, log_msg, log_msg_with_code};
+use crate::transfer::{log_msg, log_msg_with_code, ActiveTransfers, TransferSession};
 
 pub fn register_direct(mut stream: TcpStream, code: u32, transfers: ActiveTransfers) {
     let sender_address = match stream.peer_addr() {

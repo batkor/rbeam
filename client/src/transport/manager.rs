@@ -1,12 +1,12 @@
+use crate::protocol::ReceiveConfig;
+use crate::transport::{new_cancel, p2p_direct, p2p_proxy, p2p_radar};
+use rand::Rng;
 use std::io;
 use std::net::TcpStream;
 use std::sync::atomic::Ordering;
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
-use rand::Rng;
-use crate::protocol::ReceiveConfig;
-use crate::transport::{new_cancel, p2p_direct, p2p_proxy, p2p_radar};
 
 enum SelectedTransport {
     Radar(TcpStream),
@@ -65,7 +65,7 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
             cancel.store(true, Ordering::SeqCst);
             return Err(io::Error::new(
                 io::ErrorKind::ConnectionAborted,
-                "All sending transport channels failed"
+                "All sending transport channels failed",
             ));
         }
     };
@@ -73,7 +73,10 @@ pub fn send(path: &String, selected_transport: &str) -> io::Result<()> {
     cancel.store(true, Ordering::SeqCst);
     drop(rx);
 
-    println!("Receiver connected via transport: [{}]. Starting directory crawler...", transport_name);
+    println!(
+        "Receiver connected via transport: [{}]. Starting directory crawler...",
+        transport_name
+    );
 
     if let Err(e) = crate::path_crawler::send_path(target_path, &mut active_stream) {
         eprintln!("[Manager Log] Directory crawler failed: {}", e);
@@ -128,7 +131,7 @@ pub fn receive(code: u32, config: &ReceiveConfig) -> io::Result<()> {
             cancel.store(true, Ordering::SeqCst);
             return Err(io::Error::new(
                 io::ErrorKind::ConnectionAborted,
-                "All parallel transport channels failed"
+                "All parallel transport channels failed",
             ));
         }
     };

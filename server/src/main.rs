@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use std::net::TcpListener;
 use std::sync::{Arc, Mutex};
-use std::collections::HashMap;
 use std::thread;
 
 pub mod transfer;

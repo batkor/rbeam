@@ -1,10 +1,10 @@
 use clap::{Parser, ValueEnum};
 use std::io;
 
-pub mod protocol;
 pub mod path_crawler;
-pub mod utils;
+pub mod protocol;
 pub mod transport;
+pub mod utils;
 
 #[derive(Clone, Debug, ValueEnum)]
 enum TransportKind {

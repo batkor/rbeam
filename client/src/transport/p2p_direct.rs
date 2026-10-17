@@ -2,7 +2,7 @@ use std::io::{self, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::time::Duration;
 
-use crate::transport::{Cancel, SERVER_ADDR, accept_cancellable, is_cancelled, read_line};
+use crate::transport::{accept_cancellable, is_cancelled, read_line, Cancel, SERVER_ADDR};
 
 pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     let p2p_listener = TcpListener::bind("0.0.0.0:5001")?;
@@ -19,7 +19,10 @@ pub fn send(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     drop(server_stream);
 
     if server_response.starts_with("ERR") {
-        return Err(io::Error::new(io::ErrorKind::AlreadyExists, "Code conflict on server"));
+        return Err(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            "Code conflict on server",
+        ));
     }
 
     println!("[P2P] Waiting for Client 2 to connect directly via LAN...");
@@ -37,7 +40,10 @@ pub fn receive(code: u32, cancel: Cancel) -> io::Result<TcpStream> {
     drop(server_stream);
 
     if !server_response.starts_with("P2P:") {
-        return Err(io::Error::new(io::ErrorKind::NotFound, "No direct sender registered"));
+        return Err(io::Error::new(
+            io::ErrorKind::NotFound,
+            "No direct sender registered",
+        ));
     }
 
     let p2p_address = server_response.replace("P2P:", "");

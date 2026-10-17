@@ -1,5 +1,5 @@
-pub mod sender;
 pub mod receiver;
+pub mod sender;
 
 use std::collections::HashMap;
 use std::io::{Read, Write};
@@ -29,11 +29,16 @@ pub fn log_msg(msg: &str) {
     let hours = (total_secs / 3600) % 24;
     let millis = now.subsec_millis();
 
-    println!("[{:02}:{:02}:{:02}.{:03}] {}", hours, mins, secs, millis, msg);
+    println!(
+        "[{:02}:{:02}:{:02}.{:03}] {}",
+        hours, mins, secs, millis, msg
+    );
 }
 
 pub fn log_msg_with_code(code: u32, msg: &str) {
-    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default();
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default();
     let total_secs = now.as_secs();
     let secs = total_secs % 60;
     let mins = (total_secs / 60) % 60;
@@ -54,7 +59,9 @@ pub fn handle_client(mut stream: TcpStream, transfers: ActiveTransfers) {
         Err(_) => return,
     };
 
-    let get_data = String::from_utf8_lossy(&buffer[..bytes_read]).trim().to_string();
+    let get_data = String::from_utf8_lossy(&buffer[..bytes_read])
+        .trim()
+        .to_string();
 
     if let Some(code_str) = get_data.strip_prefix("GET:DIRECT:") {
         if let Ok(code) = code_str.parse::<u32>() {
@@ -92,8 +99,12 @@ pub fn relay_streams(code: u32, client1: TcpStream, client2: TcpStream) {
     let t1 = thread::spawn(move || {
         let mut buf = [0; 8192];
         while let Ok(n) = c1_read.read(&mut buf) {
-            if n == 0 { break; }
-            if c2_write.write_all(&buf[..n]).is_err() { break; }
+            if n == 0 {
+                break;
+            }
+            if c2_write.write_all(&buf[..n]).is_err() {
+                break;
+            }
         }
     });
 
@@ -103,8 +114,12 @@ pub fn relay_streams(code: u32, client1: TcpStream, client2: TcpStream) {
     let t2 = thread::spawn(move || {
         let mut buf = [0; 8192];
         while let Ok(n) = c2_read.read(&mut buf) {
-            if n == 0 { break; }
-            if c1_write.write_all(&buf[..n]).is_err() { break; }
+            if n == 0 {
+                break;
+            }
+            if c1_write.write_all(&buf[..n]).is_err() {
+                break;
+            }
         }
     });
 

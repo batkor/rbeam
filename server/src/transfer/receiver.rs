@@ -1,19 +1,24 @@
 use std::io::Write;
 use std::net::TcpStream;
 
-use crate::transfer::{ActiveTransfers, WAKE_BYTE, log_msg_with_code, relay_streams};
+use crate::transfer::{log_msg_with_code, relay_streams, ActiveTransfers, WAKE_BYTE};
 
 /// Receiver asks for the sender address to connect directly over LAN.
 pub fn get_direct(mut stream: TcpStream, code: u32, transfers: ActiveTransfers) {
     let direct_address = {
         let storage = transfers.lock().unwrap();
-        storage.get(&code).and_then(|session| session.sender_address)
+        storage
+            .get(&code)
+            .and_then(|session| session.sender_address)
     };
 
     match direct_address {
         Some(address) => {
             let instruction = format!("P2P:{}:5001\n", address.ip());
-            log_msg_with_code(code, &format!("Sending transport instruction: {}", instruction.trim()));
+            log_msg_with_code(
+                code,
+                &format!("Sending transport instruction: {}", instruction.trim()),
+            );
 
             if stream.write_all(instruction.as_bytes()).is_ok() {
                 let _ = stream.flush();

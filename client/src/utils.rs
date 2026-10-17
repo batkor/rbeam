@@ -29,7 +29,10 @@ pub fn configure_receiver(out: Option<&str>, overwrite: bool) -> io::Result<Opti
     fs::create_dir_all(&base)?;
     let base = base.canonicalize()?;
 
-    println!("Files will be saved to {}/. Continue? [Y/n]", base.display());
+    println!(
+        "Files will be saved to {}/. Continue? [Y/n]",
+        base.display()
+    );
     let mut answer = String::new();
     io::stdin().read_line(&mut answer)?;
     let answer = answer.trim().to_ascii_lowercase();
@@ -58,12 +61,18 @@ pub fn print_transfer_summary(
     let total_size_mb = total_bytes_received as f64 / (1024.0 * 1024.0);
 
     println!("\n==================================================");
-    println!("             {} TRANSFER SUMMARY                 ", mode_label.to_uppercase());
+    println!(
+        "             {} TRANSFER SUMMARY                 ",
+        mode_label.to_uppercase()
+    );
     println!("==================================================");
     println!(" Status:       All data received successfully.");
     println!(" Directories:  {} created", total_dirs_count);
     println!(" Files:        {} received", total_files_count);
-    println!(" Total Size:   {:.2} MB ({} bytes)", total_size_mb, total_bytes_received);
+    println!(
+        " Total Size:   {:.2} MB ({} bytes)",
+        total_size_mb, total_bytes_received
+    );
     println!(" Time Elapsed: {:.2} seconds", total_elapsed);
     println!(" Average Speed:{:.2} MB/s", average_speed_mb);
     println!("==================================================\n");

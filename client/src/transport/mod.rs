@@ -1,8 +1,8 @@
 pub mod manager;
 
 pub mod p2p_direct;
-pub mod p2p_radar;
 pub mod p2p_proxy;
+pub mod p2p_radar;
 
 use std::io::{self, Read};
 use std::net::{TcpListener, TcpStream};
@@ -48,11 +48,10 @@ pub fn read_line(stream: &mut TcpStream, cancel: &Cancel) -> io::Result<String> 
                 }
             }
             Err(ref e)
-            if e.kind() == io::ErrorKind::WouldBlock
-                || e.kind() == io::ErrorKind::TimedOut =>
-                {
-                    continue;
-                }
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
+            {
+                continue;
+            }
             Err(e) => return Err(e),
         }
     }
